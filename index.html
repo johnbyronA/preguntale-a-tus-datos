@@ -25,6 +25,7 @@
       <span>Pregúntale a tus datos</span>
     </a>
     <div class="topbar-actions">
+      <button type="button" class="text-btn" id="btn-guide">Guía</button>
       <div class="seg" role="radiogroup" aria-label="Motor de interpretación">
         <button type="button" role="radio" aria-checked="true" data-engine="local">Motor local</button>
         <button type="button" role="radio" aria-checked="false" data-engine="claude">Claude</button>
@@ -50,38 +51,72 @@
       <div class="dataset-line">
         <span id="dataset-name" class="dataset-name">Cargando datos…</span>
         <span id="dataset-meta" class="dataset-meta"></span>
-        <label class="link-btn" for="file-input">Usar mi archivo</label>
+      </div>
+      <div class="upload-line">
+        <label class="upload-btn" for="file-input">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Cargar mi archivo
+        </label>
         <input id="file-input" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.parquet" hidden>
+        <span class="upload-hint">CSV, Excel, JSON o Parquet. También puedes soltarlo sobre la página.</span>
         <button type="button" class="link-btn" id="btn-demo" hidden>Volver a la demo</button>
       </div>
+      <div id="detected" class="detected" role="status" hidden></div>
 
       <form id="ask-form" class="ask-box" autocomplete="off">
-        <label for="pregunta" class="sr-only">Tu pregunta</label>
-        <input id="pregunta" name="q" type="text" placeholder="¿Qué ciudad vende más en 2025?" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="autocomplete">
+        <div class="ask-field">
+          <div id="ask-mirror" class="ask-text ask-mirror" aria-hidden="true"></div>
+          <label for="pregunta" class="sr-only">Tu pregunta</label>
+          <input id="pregunta" class="ask-text" name="q" type="text" placeholder="¿Qué ciudad vende más en 2025?" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="autocomplete" aria-describedby="gloss">
+        </div>
         <button type="submit" class="btn-primary" id="btn-ask">Preguntar</button>
         <ul id="autocomplete" class="autocomplete" role="listbox" hidden></ul>
       </form>
 
       <!-- Glosa: la pregunta anotada palabra por palabra -->
       <div class="gloss-wrap" aria-live="polite">
+        <p class="gloss-title">Así entiendo tu pregunta</p>
         <p id="gloss" class="gloss"></p>
         <ul class="legend" aria-label="Leyenda">
-          <li><i class="k k-metric"></i>métrica</li>
-          <li><i class="k k-dimension"></i>agrupar por</li>
-          <li><i class="k k-filter"></i>filtro</li>
-          <li><i class="k k-time"></i>periodo</li>
+          <li><i class="k k-metric"></i>qué medir</li>
+          <li><i class="k k-dimension"></i>cómo agrupar</li>
+          <li><i class="k k-filter"></i>qué filtrar</li>
+          <li><i class="k k-time"></i>cuándo</li>
           <li><i class="k k-modifier"></i>orden y cálculo</li>
         </ul>
       </div>
 
-      <div id="suggestions" class="suggestions" aria-label="Preguntas sugeridas"></div>
+      <!-- Variables de la tabla, por papel -->
+      <section class="vars" aria-labelledby="vars-title">
+        <div class="vars-head">
+          <h2 id="vars-title">Variables de tu tabla</h2>
+          <p class="hint">Haz clic en una para agregarla a la pregunta.</p>
+        </div>
+        <div class="vars-grid">
+          <div class="vars-row metric"><h3>Qué medir</h3><div class="vars-chips" id="vars-metric"></div></div>
+          <div class="vars-row dimension"><h3>Cómo agrupar</h3><div class="vars-chips" id="vars-dimension"></div></div>
+          <div class="vars-row filter"><h3>Qué filtrar</h3><div class="vars-chips" id="vars-filter"></div></div>
+          <div class="vars-row time"><h3>Cuándo</h3><div class="vars-chips" id="vars-time"></div></div>
+        </div>
+        <div id="vars-values" class="vars-values" hidden></div>
+      </section>
+
+      <div class="suggest-wrap">
+        <p class="suggest-title">Prueba con</p>
+        <div id="suggestions" class="suggestions" aria-label="Preguntas sugeridas"></div>
+      </div>
+
+      <details id="guide" class="guide">
+        <summary>Guía: todas las formas de preguntar <span id="guide-sub" class="guide-sub"></span></summary>
+        <div id="guide-body" class="guide-body"></div>
+      </details>
     </section>
 
     <div class="workspace">
       <!-- Esquema -->
       <aside class="schema" aria-labelledby="schema-title">
-        <h2 id="schema-title">Columnas</h2>
-        <p class="hint">Haz clic en una columna para usarla en la pregunta.</p>
+        <h2 id="schema-title">Perfil de columnas</h2>
+        <p class="hint">Tipo, rango y valores frecuentes de cada columna.</p>
         <ul id="schema-list" class="schema-list"></ul>
         <h2 class="history-title">Historial</h2>
         <ol id="history" class="history"><li class="empty">Tus preguntas aparecerán aquí.</li></ol>

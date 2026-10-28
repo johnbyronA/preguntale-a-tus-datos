@@ -4,6 +4,7 @@ import { normalize, phrase, pluralize } from '../engine/text.js';
 import { headline, fmt, fmtCell, pct, cap } from '../engine/format.js';
 import { findInsights } from '../engine/insights.js';
 import { EVALSET, checkIntent } from '../engine/evalset.js';
+import { buildGuide, pickRoles, NOT_SUPPORTED } from '../engine/guide.js';
 import { initDB, loadURL, loadFile, profile, query, assertReadOnly } from './db.js';
 import { LIBS } from './libs.js';
 import { inferShape, chartChoices, buildOption, sparkline, CHART_NAMES } from './charts.js';
@@ -92,7 +93,10 @@ async function setDataset(table, name, isDemo) {
   $('#btn-lab').disabled = !isDemo;
   $('#btn-lab').title = isDemo ? '' : 'El banco de pruebas usa los datos de demostración';
   renderSchema();
+  renderVars();
   renderSuggestions();
+  renderGuide();
+  renderDetected();
   resetResult();
   renderBoard();
   $('#pregunta').placeholder = isDemo ? '¿Qué ciudad vende más en 2025?' : suggestionsFor(state.schema)[1] || 'Escribe tu pregunta';
@@ -110,8 +114,9 @@ function fmtDate(s) {
 function bindUI() {
   const input = $('#pregunta');
   $('#ask-form').addEventListener('submit', (e) => { e.preventDefault(); closeAutocomplete(); ask(input.value); });
-  let t;
-  input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => liveGloss(input.value), 90); updateAutocomplete(); });
+  input.addEventListener('input', () => { liveGloss(input.value); updateAutocomplete(); });
+  for (const ev of ['scroll', 'keyup', 'click', 'select']) input.addEventListener(ev, syncMirror);
+  $('#btn-guide').addEventListener('click', () => openGuide(true));
   input.addEventListener('keydown', onAutocompleteKey);
   input.addEventListener('blur', () => setTimeout(closeAutocomplete, 150));
 
@@ -136,8 +141,9 @@ function bindUI() {
   $('#btn-lab').addEventListener('click', runLab);
 
   // arrastrar y soltar archivos sobre la página
-  document.addEventListener('dragover', (e) => { e.preventDefault(); });
-  document.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dragging'); });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
+  document.addEventListener('drop', (e) => { e.preventDefault(); document.body.classList.remove('dragging'); const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
 
   new ResizeObserver(() => state.chart?.resize()).observe($('#chart'));
   window.addEventListener('hashchange', () => { const q = new URLSearchParams(location.hash.slice(1)).get('q'); if (q && q !== state.cur?.question) { $('#pregunta').value = q; ask(q); } });
@@ -198,7 +204,9 @@ async function openFile(file) {
     await setDataset(table, file.name, false);
     toast(`${file.name} cargado en ${Math.round(performance.now() - t0)} ms. Ya puedes preguntar.`);
     $('#pregunta').value = ''; liveGloss('');
-    $('#pregunta').focus();
+    $('#guide').open = true;
+    $('.ask').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('#pregunta').focus({ preventScroll: true });
   } catch (err) {
     showError(`No se pudo leer ${file.name}.`, `${err.message}. Formatos admitidos: CSV, TSV, Excel (primera hoja), JSON y Parquet.`);
     if (state.schema) $('#dataset-name').textContent = state.datasetName;
@@ -220,7 +228,7 @@ function renderSchema() {
     else sub = ids.includes(c.name) ? `${c.distinct.toLocaleString('es-CO')} valores únicos (identificador)` : `${c.distinct.toLocaleString('es-CO')} valores: ${(c.top || []).slice(0, 3).map((t) => t.v).join(', ')}`;
     const nulls = c.nulls ? el('span', { class: 'nulls' }, ` ${c.nulls.toLocaleString('es-CO')} vacíos`) : null;
     list.append(el('li', {},
-      el('button', { type: 'button', title: `Usar «${phrase(c.name)}» en la pregunta`, onclick: () => insertWord(phrase(c.name)) },
+      el('button', { type: 'button', title: `Usar «${phrase(c.name)}» en la pregunta`, onclick: () => insertText(phrase(c.name)) },
         el('span', { class: 't', 'aria-label': c.type === 'number' ? 'número' : c.type === 'date' ? 'fecha' : 'texto' }, tag),
         el('span', { class: 'n' }, c.name),
         el('span', { class: 'p', html: prof }),
@@ -228,30 +236,159 @@ function renderSchema() {
   }
 }
 
-function insertWord(w) {
+/** Inserta texto en la posición del cursor, con los espacios necesarios. */
+function insertText(text) {
   const input = $('#pregunta');
-  const v = input.value.trimEnd();
-  input.value = v ? `${v} ${w}` : cap(w);
-  input.focus(); liveGloss(input.value);
+  const v = input.value;
+  const a = input.selectionStart ?? v.length; const b = input.selectionEnd ?? v.length;
+  const before = v.slice(0, a); const after = v.slice(b);
+  const pre = before && !/\s$/.test(before) ? ' ' : '';
+  const post = after && !/^\s/.test(after) ? ' ' : '';
+  const piece = before.trim() ? text : cap(text);
+  input.value = `${before}${pre}${piece}${post}${after}`;
+  const caret = (before + pre + piece + post).length;
+  input.focus();
+  input.setSelectionRange(caret, caret);
+  liveGloss(input.value);
+}
+
+// ---------------------------------------------------------------------------
+// Variables de la tabla (por papel) y guía
+// ---------------------------------------------------------------------------
+/** Inserta un valor de filtro con su preposición ("de Medellín") si hace falta. */
+function insertValue(v) {
+  const input = $('#pregunta');
+  const before = normalize(input.value.slice(0, input.selectionStart ?? input.value.length)).trimEnd();
+  const needsDe = before && !/(?:^|\s)(de|del|en|y|o|excepto|sin|menos|salvo|que no sea|a|para)$/.test(before);
+  insertText(needsDe ? `de ${v}` : v);
+}
+
+function varChip(label, hint, onclick, extra = {}) {
+  return el('button', { type: 'button', class: 'var', onclick, ...extra }, label, hint ? el('small', {}, hint) : null);
+}
+
+function renderVars() {
+  const sch = state.schema; const r = schemaRoles(sch);
+  const box = { metric: $('#vars-metric'), dimension: $('#vars-dimension'), filter: $('#vars-filter'), time: $('#vars-time') };
+  Object.values(box).forEach((b) => { b.innerHTML = ''; });
+  $('#vars-values').hidden = true;
+  const isAvg = (n) => /pct|porcentaje|tasa|calific|rating|dias|precio|edad|tiempo|score/.test(n.toLowerCase());
+
+  for (const m of r.metrics) box.metric.append(varChip(phrase(m.name), isAvg(m.name) ? 'promedio' : 'suma', () => insertText(phrase(m.name)), { title: `Columna numérica ${m.name}` }));
+  box.metric.append(varChip('registros', 'conteo', () => insertText('cuántos registros'), { title: 'Contar filas' }));
+  if (r.conceptCol.profit && r.conceptCol.revenue) box.metric.append(varChip('margen', `${r.conceptCol.profit} ÷ ${r.conceptCol.revenue}`, () => insertText('margen')));
+
+  for (const d of r.dims) box.dimension.append(varChip(phrase(d.name), `${d.distinct}`, () => insertText(`por ${phrase(d.name)}`), { title: `${d.distinct} valores distintos` }));
+  if (r.date) for (const [w, lab] of [['por mes', 'mes'], ['por trimestre', 'trimestre'], ['por año', 'año'], ['por día de la semana', 'día de la semana']]) box.dimension.append(varChip(lab, 'tiempo', () => insertText(w)));
+  if (!box.dimension.children.length) box.dimension.append(el('span', { class: 'vars-empty' }, 'No hay columnas de texto para agrupar.'));
+
+  const textCols = sch.columns.filter((c) => c.type === 'text' && !r.idCols.includes(c.name));
+  for (const c of textCols) {
+    const many = !c.values?.length;
+    box.filter.append(varChip(phrase(c.name), many ? 'muchos valores' : 'ver valores', (e) => toggleValues(c, e.currentTarget), { 'aria-expanded': 'false', 'aria-controls': 'vars-values' }));
+  }
+  if (r.metrics[0]) { const m = r.metrics.find((x) => x.name === r.conceptCol.qty) || r.metrics[0]; box.filter.append(varChip(`con ${phrase(m.name)} mayor a…`, 'número', () => insertText(`con ${phrase(m.name)} mayor a`))); }
+  box.filter.append(varChip('excepto…', 'excluir', () => insertText('excepto')));
+
+  if (r.date) {
+    const lastY = String(r.date.max).slice(0, 4);
+    box.time.append(el('span', { class: 'vars-empty', style: 'flex-basis:100%' }, `${phrase(r.date.name)}: ${fmtDate(r.date.min)} a ${fmtDate(r.date.max)}`));
+    for (const w of [`en ${lastY}`, 'este año', 'el año pasado', 'el último mes', 'los últimos 3 meses', 'el primer semestre']) box.time.append(varChip(w, null, () => insertText(w)));
+  } else box.time.append(el('span', { class: 'vars-empty' }, 'Esta tabla no tiene columnas de fecha.'));
+}
+
+function toggleValues(col, btn) {
+  const panel = $('#vars-values');
+  const open = btn.getAttribute('aria-expanded') === 'true';
+  document.querySelectorAll('#vars-filter .var[aria-expanded]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  if (open) { panel.hidden = true; return; }
+  btn.setAttribute('aria-expanded', 'true');
+  panel.innerHTML = '';
+  if (!col.values?.length) {
+    panel.append(el('p', {}, `${col.name} tiene ${col.distinct.toLocaleString('es-CO')} valores distintos: son demasiados para filtrar por nombre, pero puedes agrupar por esta columna.`));
+  } else {
+    panel.append(el('p', {}, `Valores de ${col.name} (${col.values.length}). Escribe cualquiera tal como aparece para filtrar:`));
+    const chips = el('div', { class: 'vars-chips' });
+    for (const v of col.values) chips.append(varChip(v, null, () => insertValue(v)));
+    panel.append(chips);
+  }
+  panel.hidden = false;
+}
+
+const GROUP_KIND = { 'Qué medir': 'metric', 'Cómo agrupar': 'dimension', 'Qué filtrar': 'filter', 'Cuándo': 'time', 'Ver registros': 'detail' };
+
+function renderGuide() {
+  const body = $('#guide-body'); body.innerHTML = '';
+  const guide = buildGuide(state.schema);
+  const total = guide.reduce((s, g) => s + g.items.length, 0);
+  $('#guide-sub').textContent = state.isDemo ? `${total} patrones con ejemplos` : `${total} patrones con ejemplos de ${state.datasetName}`;
+
+  // la fórmula, armada con columnas reales
+  const { money, d1, v1, date } = pickRoles(state.schema);
+  const parts = [
+    money && ['metric', cap(phrase(money.name)), 'qué medir'],
+    (date || d1) && ['dimension', date ? 'por mes' : `por ${phrase(d1.name)}`, 'cómo agrupar'],
+    v1 && ['filter', `de ${v1}`, 'qué filtrar'],
+    date && ['time', `en ${String(date.max).slice(0, 4)}`, 'cuándo'],
+  ].filter(Boolean);
+  const formula = el('p', { class: 'gloss guide-formula' });
+  parts.forEach(([k, t, l], i) => { if (i) formula.append(el('span', { class: 'plain' }, ' ')); formula.append(el('span', { class: `g ${k}` }, el('span', {}, t), el('small', {}, l))); });
+  const q = parts.map((p) => p[1]).join(' ');
+  body.append(formula, el('p', {}, 'Toda pregunta combina estas cuatro piezas. Puedes usar una sola o todas, en el orden que quieras. Abajo están todas las palabras que el motor reconoce y un ejemplo con tu tabla; haz clic en un ejemplo para probarlo. ', q ? el('button', { type: 'button', class: 'try', style: 'display:inline', onclick: () => tryQuestion(q) }, q) : null));
+
+  const groups = el('div', { class: 'guide-groups' });
+  for (const g of guide) {
+    const col = el('section', { class: `guide-group ${GROUP_KIND[g.group] || ''}` }, el('h3', {}, g.group));
+    for (const it of g.items) {
+      col.append(el('div', { class: 'guide-item' },
+        el('h4', {}, it.title),
+        el('p', {}, it.explain),
+        el('div', {}, it.words.map((w) => el('span', { class: 'kw' }, w))),
+        el('button', { type: 'button', class: 'try', onclick: () => tryQuestion(it.example) }, it.example)));
+    }
+    groups.append(col);
+  }
+  body.append(groups);
+  body.append(el('div', { class: 'guide-limits' }, el('h3', {}, 'Lo que el motor local todavía no entiende'), el('ul', {}, NOT_SUPPORTED.map((t) => el('li', {}, t)))));
+}
+
+function tryQuestion(q) {
+  $('#pregunta').value = q;
+  ask(q);
+  $('.ask').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function openGuide(scroll) {
+  const g = $('#guide'); g.open = true;
+  if (scroll) g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** Explica qué se detectó en un archivo recién cargado. */
+function renderDetected() {
+  const box = $('#detected'); box.innerHTML = '';
+  if (state.isDemo) { box.hidden = true; return; }
+  const sch = state.schema; const r = schemaRoles(sch);
+  const list = (cols) => cols.map((c) => c.name).join(', ');
+  const many = sch.columns.filter((c) => c.type === 'text' && !c.values?.length && !r.idCols.includes(c.name));
+  const items = [];
+  items.push(el('li', {}, r.metrics.length ? `Para medir (${r.metrics.length}): ${list(r.metrics)}.` : 'No hay columnas numéricas: podrás contar registros, pero no sumar ni promediar.'));
+  items.push(el('li', {}, r.dims.length ? `Para agrupar y filtrar (${r.dims.length}): ${list(r.dims)}.` : 'No hay columnas de texto con categorías para agrupar.'));
+  items.push(el('li', {}, r.date ? `Fecha: ${r.date.name}, de ${r.date.min} a ${r.date.max}. «Este año» o «el mes pasado» se calculan contra ${r.date.max}.` : 'No encontré fechas, así que las preguntas por periodo no aplican. Si tienes fechas, guárdalas como AAAA-MM-DD.'));
+  if (r.idCols.length) items.push(el('li', {}, `Identificadores: ${r.idCols.join(', ')}. Se usan para contar registros.`));
+  if (many.length) items.push(el('li', {}, `${list(many)}: demasiados valores distintos para filtrar por nombre; sí puedes agrupar.`));
+  box.append(
+    el('button', { type: 'button', class: 'close', 'aria-label': 'Cerrar aviso', onclick: () => { box.hidden = true; } }, '×'),
+    el('div', {}, el('b', {}, `Listo: ${state.datasetName} tiene ${sch.rows.toLocaleString('es-CO')} filas.`), ' Esto es lo que detecté:'),
+    el('ul', {}, items),
+    el('div', {}, 'Usa las variables de abajo o abre la guía: los ejemplos ya usan tus columnas.'));
+  box.hidden = false;
 }
 
 function suggestionsFor(schema) {
-  const r = schemaRoles(schema);
-  const money = r.metrics.find((m) => m.name === r.conceptCol.revenue) || r.metrics.find((m) => /ingreso|venta|monto|valor|total|precio|costo/.test(m.name)) || r.metrics[0];
-  const other = r.metrics.find((m) => m !== money);
-  const dims = [...r.dims].sort((a, b) => a.distinct - b.distinct);
-  const d1 = dims[0]; const d2 = dims.find((d) => d !== d1 && d.distinct > 4) || dims[1];
-  const m = money ? phrase(money.name) : null;
-  const out = [];
-  if (m) out.push(`¿Cuál es el total de ${m}?`);
-  if (m && d1) out.push(`${cap(m)} por ${phrase(d1.name)}`);
-  if (m && r.date) out.push(`Evolución mensual de ${m}`);
-  if (m && d2) out.push(`Top 5 ${pluralize(phrase(d2.name))} por ${m}`);
-  if (other && d1) out.push(`Promedio de ${phrase(other.name)} por ${phrase(d1.name)}`);
-  if (m && d1 && r.date) out.push(`${cap(m)} por mes y ${phrase(d1.name)}`);
-  if (m && d2 && d2.values?.[0]) out.push(`${cap(m)} de ${d2.values[0]} por ${r.date ? 'mes' : phrase(d1.name)}`);
-  if (m && d1) out.push(`Participación de cada ${phrase(d1.name)} en ${m}`);
-  if (!m && d1) out.push(`¿Cuántos registros hay por ${phrase(d1.name)}?`);
+  const prefer = ['Por una columna', 'Tendencia en el tiempo', 'Top y orden', 'Tasa de un valor', 'Comparar años', 'Por dos columnas', 'Excluir', 'Fechas relativas', 'Participación en el total'];
+  const items = buildGuide(schema).flatMap((g) => g.items);
+  const out = prefer.map((t) => items.find((i) => i.title === t)?.example).filter(Boolean);
+  for (const i of items) if (out.length < 8 && !out.includes(i.example)) out.push(i.example);
   return out.slice(0, 8);
 }
 
@@ -266,11 +403,28 @@ function renderSuggestions() {
 // ---------------------------------------------------------------------------
 const KIND_NAME = { metric: 'métrica', dimension: 'agrupar', filter: 'filtro', time: 'periodo', modifier: 'cálculo' };
 
+function renderMirror(question, spans) {
+  const input = $('#pregunta'); const mirror = $('#ask-mirror');
+  mirror.innerHTML = '';
+  // solo se dibuja si las marcas corresponden al texto que está en el campo
+  if (question !== input.value) { mirror.textContent = input.value; syncMirror(); return; }
+  let pos = 0;
+  for (const s of spans) {
+    if (s.start > pos) mirror.append(document.createTextNode(question.slice(pos, s.start)));
+    mirror.append(el('span', { class: `m ${s.kind}` }, question.slice(s.start, s.end)));
+    pos = s.end;
+  }
+  mirror.append(document.createTextNode(question.slice(pos)));
+  syncMirror();
+}
+function syncMirror() { const m = $('#ask-mirror'); m.scrollLeft = $('#pregunta').scrollLeft; }
+
 function renderGloss(question, spans) {
+  renderMirror(question, spans);
   const g = $('#gloss'); g.innerHTML = '';
   if (!question.trim()) {
     g.classList.add('is-empty');
-    g.textContent = 'Mientras escribes, aquí verás cómo se entiende cada parte de tu pregunta.';
+    g.textContent = 'Mientras escribes, cada parte de tu pregunta se marca con su papel: qué medir, cómo agrupar, qué filtrar y cuándo.';
     return;
   }
   g.classList.remove('is-empty');
@@ -309,7 +463,7 @@ function updateAutocomplete() {
     if (e.partial || e.derived || e.concept) continue;
     const label = e.kind === 'value' ? e.value : phrase(e.column);
     if (seen.has(label)) continue;
-    if (e.phrase.startsWith(frag) && e.phrase !== frag) { seen.add(label); acItems.push({ label, kind: e.kind === 'value' ? `valor de ${e.column}` : 'columna', frag: m[1] }); }
+    if (e.phrase.startsWith(frag) && e.phrase !== frag && normalize(label).trim() !== frag) { seen.add(label); acItems.push({ label, kind: e.kind === 'value' ? `valor de ${e.column}` : 'columna', frag: m[1] }); }
     if (acItems.length >= 8) break;
   }
   if (!acItems.length) return closeAutocomplete();

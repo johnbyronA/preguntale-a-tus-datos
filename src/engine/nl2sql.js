@@ -317,7 +317,6 @@ export function parse(question, schema) {
   }
   if (intent.time && refDate) {
     if (intent.time.to && intent.time.to > refDate && (!intent.time.from || intent.time.from <= refDate)) intent.time.to = String(refDate).slice(0, 10);
-    if (intent.time.from && minDate && intent.time.from < minDate && (!intent.time.to || intent.time.to >= minDate)) intent.time.from = String(minDate).slice(0, 10);
     if ((intent.time.from && intent.time.from > refDate) || (intent.time.to && minDate && intent.time.to < minDate)) notes.push(`Los datos van de ${minDate} a ${refDate}; el periodo pedido queda fuera.`);
   }
 
@@ -372,7 +371,11 @@ export function parse(question, schema) {
   for (const g of Object.values(byCol)) {
     const vals = [...g.values];
     intent.filters.push({ column: g.column, op: g.neg ? (vals.length > 1 ? 'NOT IN' : '!=') : (vals.length > 1 ? 'IN' : '='), value: vals.length > 1 ? vals : vals[0] });
-    for (const h of g.hits) span(h, 'filter', `${g.column} ${g.neg ? '≠' : '='} ${h.value}`);
+    for (const h of g.hits) {
+      let start = h.start;
+      if (g.neg) { const mm = n.slice(Math.max(0, h.start - 30), h.start).match(/(excepto|salvo|sin(?:\s+contar)?|excluyendo|exceptuando|menos|que\s+no\s+sean?|no\s+sean?|distint[oa]\s+(?:de|a)|diferente\s+(?:de|a))\s+(?:(?:el|la|los|las|de|en|del)\s+)*$/); if (mm) start = h.start - mm[0].length; }
+      span({ start, end: h.end }, 'filter', `${g.column} ${g.neg ? '≠' : '='} ${h.value}`);
+    }
   }
 
   // Columnas mencionadas: numéricas → métrica; texto → dimensión
@@ -557,7 +560,9 @@ export function parse(question, schema) {
 
   // Comparar contra el periodo anterior cuando la respuesta es un solo número con periodo
   if (intent.kind === 'aggregate' && !intent.dims.length && intent.time?.from && intent.time?.to && !intent.compare && !intent.extras.avgOfPeriod) {
-    intent.extras.previousPeriod = previousRange(intent.time.from, intent.time.to);
+    const prev = previousRange(intent.time.from, intent.time.to);
+    // solo se compara si hay datos en el periodo anterior
+    if (!minDate || prev.to >= String(minDate).slice(0, 10)) intent.extras.previousPeriod = prev;
   }
 
   // Confianza

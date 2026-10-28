@@ -12,7 +12,9 @@ En cualquier empresa hay alguien que necesita un dato y depende de que otra pers
 
 ## Lo que hace
 
-- **Entiende la pregunta y lo muestra.** Cada fragmento se anota con su papel: métrica, agrupación, filtro, periodo o cálculo. Si algo se interpretó mal, se ve de inmediato.
+- **Entiende la pregunta y lo muestra.** Mientras escribes, cada fragmento se subraya en el propio campo con su papel: qué medir, cómo agrupar, qué filtrar o cuándo. Si algo no se marcó, el motor no lo entendió.
+- **Variables de tu tabla a la vista.** Un panel muestra qué se puede medir, agrupar, filtrar y en qué periodo; con un clic se agregan a la pregunta.
+- **Guía dentro de la página.** Todas las formas de preguntar, con sus palabras clave y un ejemplo armado con las columnas del archivo cargado. Al subir un archivo, la página explica qué detectó.
 - **Lenguaje de negocio en español.** Sinónimos («ventas», «facturación» → ingreso), valores reales de la tabla («Medellín», «E-commerce»), exclusiones («excepto Bogotá»), comparadores («más de 10 unidades», «descuento mayor al 15 %») y fechas («últimos 3 meses», «primer semestre de 2025», «este año vs el año pasado»).
 - **Cálculos que se piden a diario:** totales, promedios, medianas, conteos distintos, top N, participación en el total, variación contra el periodo anterior, acumulados, tasas («tasa de devolución»), márgenes y promedio mensual.
 - **Intención editable.** Métrica, agrupación, filtros, periodo y orden se pueden cambiar con controles sin reescribir la pregunta. El SQL también se puede editar y ejecutar.
@@ -38,7 +40,7 @@ El motor local no usa IA ni servicios externos. Las fechas relativas («este añ
 
 ## Pruebas
 
-El banco de pruebas (`src/engine/evalset.js`) tiene 35 preguntas con la interpretación esperada. Corre en CI con DuckDB nativo y también en vivo desde la sección «Laboratorio» de la demo.
+El banco de pruebas (`src/engine/evalset.js`) tiene 35 preguntas con la interpretación esperada. Además, los ejemplos de la guía se generan y ejecutan sobre dos tablas distintas (ventas y gastos) para comprobar que el motor no depende de la demo. Corre en CI con DuckDB nativo y también en vivo desde la sección «Laboratorio» de la demo.
 
 ```bash
 npm install
@@ -65,6 +67,7 @@ Los datos de demostración se regeneran con `npm run data` (Python con pandas y 
 index.html            página de la demo
 assets/               estilos, fuentes e íconos
 src/engine/           motor (sin dependencias del navegador, se prueba en Node)
+  guide.js            guía de preguntas con ejemplos según la tabla
   nl2sql.js           vocabulario, interpretación, SQL y explicación
   time.js             expresiones de tiempo en español
   text.js             normalización, números y plurales

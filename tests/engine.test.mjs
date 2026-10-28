@@ -48,3 +48,23 @@ test('una pregunta sin nada reconocible tiene confianza baja', () => {
   const i = parse('hola, ¿cómo estás?', schema);
   assert.ok(i.confidence <= 0.2);
 });
+
+// Los ejemplos de la guía se generan para cualquier tabla: todos deben
+// entenderse y ejecutarse, tanto en la demo como en una tabla distinta.
+import { buildGuide } from '../src/engine/guide.js';
+import { profileNode } from './profile-node.mjs';
+
+for (const [table, file] of [['ventas', '../data/ventas_demo.csv'], ['gastos', './fixtures/gastos.csv']]) {
+  test(`guía: todos los ejemplos funcionan con la tabla ${table}`, async () => {
+    if (table !== 'ventas') await con.run(`CREATE TABLE ${table} AS SELECT * FROM read_csv_auto('${new URL(file, import.meta.url).pathname}')`);
+    const sch = await profileNode(con, table);
+    const items = buildGuide(sch).flatMap((g) => g.items);
+    assert.ok(items.length >= 18, `solo ${items.length} ejemplos`);
+    for (const it of items) {
+      const intent = parse(it.example, sch);
+      assert.ok(intent.confidence > 0.3, `poca confianza en «${it.example}»`);
+      const res = await con.runAndReadAll(buildSQL(intent, sch));
+      assert.ok(res.getRows().length > 0, `sin filas: «${it.example}»`);
+    }
+  });
+}
