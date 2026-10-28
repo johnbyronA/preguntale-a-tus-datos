@@ -1,0 +1,186 @@
+{
+ "table": "ventas",
+ "rows": 24000,
+ "columns": [
+  {
+   "name": "id_pedido",
+   "type": "text",
+   "distinct": 24000,
+   "values": []
+  },
+  {
+   "name": "fecha",
+   "type": "date",
+   "min": "2024-01-01",
+   "max": "2026-09-30"
+  },
+  {
+   "name": "region",
+   "type": "text",
+   "distinct": 4,
+   "values": [
+    "Andina",
+    "Caribe",
+    "Pacífico",
+    "Orinoquía"
+   ]
+  },
+  {
+   "name": "ciudad",
+   "type": "text",
+   "distinct": 8,
+   "values": [
+    "Bogotá",
+    "Medellín",
+    "Cali",
+    "Barranquilla",
+    "Cartagena",
+    "Bucaramanga",
+    "Villavicencio",
+    "Pereira"
+   ]
+  },
+  {
+   "name": "canal",
+   "type": "text",
+   "distinct": 4,
+   "values": [
+    "Tienda física",
+    "E-commerce",
+    "Distribuidor",
+    "Televentas"
+   ]
+  },
+  {
+   "name": "categoria",
+   "type": "text",
+   "distinct": 5,
+   "values": [
+    "Tecnología",
+    "Oficina",
+    "Accesorios",
+    "Hogar",
+    "Muebles"
+   ]
+  },
+  {
+   "name": "producto",
+   "type": "text",
+   "distinct": 25,
+   "values": [
+    "Organizador de escritorio",
+    "Audífonos inalámbricos",
+    "Monitor 27 pulgadas",
+    "Resma de papel",
+    "Archivador",
+    "Disco SSD 1 TB",
+    "Kit de escritura",
+    "Impresora multifuncional",
+    "Tableta 10 pulgadas",
+    "Calculadora financiera",
+    "Portátil Pro 14",
+    "Licuadora",
+    "Mouse inalámbrico",
+    "Juego de ollas",
+    "Base para portátil",
+    "Mochila para portátil",
+    "Teclado mecánico",
+    "Aspiradora",
+    "Purificador de aire",
+    "Cafetera espresso",
+    "Cable USB-C",
+    "Escritorio ajustable",
+    "Mesa auxiliar",
+    "Biblioteca",
+    "Silla ergonómica"
+   ]
+  },
+  {
+   "name": "vendedor",
+   "type": "text",
+   "distinct": 14,
+   "values": [
+    "Laura Gómez",
+    "Andrés Restrepo",
+    "Camila Ospina",
+    "Julián Torres",
+    "Valentina Ríos",
+    "Santiago Mejía",
+    "Daniela Cárdenas",
+    "Mateo Vargas",
+    "Sara Quintero",
+    "Felipe Arango",
+    "Natalia Duque",
+    "Esteban Londoño",
+    "Mariana Zapata",
+    "Sebastián Henao"
+   ]
+  },
+  {
+   "name": "cantidad",
+   "type": "number",
+   "min": 1.0,
+   "max": 60.0,
+   "integer": true
+  },
+  {
+   "name": "precio_unitario",
+   "type": "number",
+   "min": 22400.0,
+   "max": 3979600.0,
+   "integer": true
+  },
+  {
+   "name": "descuento_pct",
+   "type": "number",
+   "min": 0.0,
+   "max": 28.5,
+   "integer": false
+  },
+  {
+   "name": "ingreso",
+   "type": "number",
+   "min": 0.0,
+   "max": 78087240.0,
+   "integer": true
+  },
+  {
+   "name": "costo",
+   "type": "number",
+   "min": 0.0,
+   "max": 63841396.0,
+   "integer": true
+  },
+  {
+   "name": "utilidad",
+   "type": "number",
+   "min": -36270714.0,
+   "max": 14245844.0,
+   "integer": true
+  },
+  {
+   "name": "estado",
+   "type": "text",
+   "distinct": 3,
+   "values": [
+    "Entregado",
+    "Devuelto",
+    "Cancelado"
+   ]
+  },
+  {
+   "name": "dias_entrega",
+   "type": "number",
+   "min": 0.0,
+   "max": 12.0,
+   "integer": true
+  },
+  {
+   "name": "calificacion",
+   "type": "number",
+   "min": 1.0,
+   "max": 5.0,
+   "integer": true
+  }
+ ]
+}

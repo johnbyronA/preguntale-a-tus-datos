@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pregúntale a tus datos</title>
+  <meta name="description" content="Haz preguntas en español sobre cualquier tabla (CSV o Excel) y obtén SQL, gráficos y hallazgos. Todo corre en tu navegador con DuckDB-WASM.">
+  <meta property="og:title" content="Pregúntale a tus datos">
+  <meta property="og:description" content="Preguntas en español → SQL → gráfico y hallazgos, en tu navegador.">
+  <meta property="og:image" content="https://johnbyrona.github.io/preguntale-a-tus-datos/assets/og.png">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/bricolage-grotesque.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script>
+    // tema antes de pintar para evitar parpadeo
+    try { const t = localStorage.getItem('patd-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#pregunta">Ir a la pregunta</a>
+
+  <header class="topbar">
+    <a class="wordmark" href="./" aria-label="Pregúntale a tus datos, inicio">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect x="3" y="18" width="5" height="10" rx="1.5" fill="var(--k-metric)"/><rect x="10.5" y="11" width="5" height="17" rx="1.5" fill="var(--k-dimension)"/><rect x="18" y="14" width="5" height="14" rx="1.5" fill="var(--k-filter)"/><path d="M24.5 4.5h4v4" fill="none" stroke="var(--k-time)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10l9.5-5.5" stroke="var(--k-time)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>Pregúntale a tus datos</span>
+    </a>
+    <div class="topbar-actions">
+      <div class="seg" role="radiogroup" aria-label="Motor de interpretación">
+        <button type="button" role="radio" aria-checked="true" data-engine="local">Motor local</button>
+        <button type="button" role="radio" aria-checked="false" data-engine="claude">Claude</button>
+      </div>
+      <button type="button" class="icon-btn" id="btn-settings" aria-label="Ajustes de Claude" title="Ajustes de Claude">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+      <button type="button" class="icon-btn" id="btn-theme" aria-label="Cambiar tema claro u oscuro" title="Tema">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/johnbyronA/preguntale-a-tus-datos" target="_blank" rel="noopener" aria-label="Código en GitHub" title="Código en GitHub">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.5 11.5 0 0 0 12 .5Z"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Pregunta: la pieza central -->
+    <section class="ask" aria-labelledby="ask-title">
+      <h1 id="ask-title" class="ask-title">Escribe una pregunta sobre tus datos.</h1>
+      <p class="ask-sub">El motor la traduce a SQL y la ejecuta aquí mismo, en tu navegador. Tus archivos no salen de este equipo.</p>
+
+      <div class="dataset-line">
+        <span id="dataset-name" class="dataset-name">Cargando datos…</span>
+        <span id="dataset-meta" class="dataset-meta"></span>
+        <label class="link-btn" for="file-input">Usar mi archivo</label>
+        <input id="file-input" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.parquet" hidden>
+        <button type="button" class="link-btn" id="btn-demo" hidden>Volver a la demo</button>
+      </div>
+
+      <form id="ask-form" class="ask-box" autocomplete="off">
+        <label for="pregunta" class="sr-only">Tu pregunta</label>
+        <input id="pregunta" name="q" type="text" placeholder="¿Qué ciudad vende más en 2025?" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="autocomplete">
+        <button type="submit" class="btn-primary" id="btn-ask">Preguntar</button>
+        <ul id="autocomplete" class="autocomplete" role="listbox" hidden></ul>
+      </form>
+
+      <!-- Glosa: la pregunta anotada palabra por palabra -->
+      <div class="gloss-wrap" aria-live="polite">
+        <p id="gloss" class="gloss"></p>
+        <ul class="legend" aria-label="Leyenda">
+          <li><i class="k k-metric"></i>métrica</li>
+          <li><i class="k k-dimension"></i>agrupar por</li>
+          <li><i class="k k-filter"></i>filtro</li>
+          <li><i class="k k-time"></i>periodo</li>
+          <li><i class="k k-modifier"></i>orden y cálculo</li>
+        </ul>
+      </div>
+
+      <div id="suggestions" class="suggestions" aria-label="Preguntas sugeridas"></div>
+    </section>
+
+    <div class="workspace">
+      <!-- Esquema -->
+      <aside class="schema" aria-labelledby="schema-title">
+        <h2 id="schema-title">Columnas</h2>
+        <p class="hint">Haz clic en una columna para usarla en la pregunta.</p>
+        <ul id="schema-list" class="schema-list"></ul>
+        <h2 class="history-title">Historial</h2>
+        <ol id="history" class="history"><li class="empty">Tus preguntas aparecerán aquí.</li></ol>
+      </aside>
+
+      <!-- Resultado -->
+      <section class="result" id="result" aria-labelledby="answer" aria-busy="false">
+        <div class="result-empty" id="result-empty">
+          <p>Elige una sugerencia o escribe tu pregunta para empezar.</p>
+        </div>
+
+        <div class="result-body" id="result-body" hidden>
+          <div class="answer-row">
+            <p id="answer" class="answer"></p>
+            <p id="answer-delta" class="answer-delta" hidden></p>
+          </div>
+          <p id="explanation" class="explanation"></p>
+          <p id="notes" class="notes" hidden></p>
+
+          <div class="chips" id="chips" aria-label="Ajusta la consulta"></div>
+
+          <div class="toolbar">
+            <div class="tabs" role="tablist" aria-label="Vista del resultado">
+              <button role="tab" aria-selected="true" aria-controls="view-chart" id="tab-chart">Gráfico</button>
+              <button role="tab" aria-selected="false" aria-controls="view-table" id="tab-table">Tabla</button>
+              <button role="tab" aria-selected="false" aria-controls="view-sql" id="tab-sql">SQL</button>
+            </div>
+            <div class="chart-types" id="chart-types" aria-label="Tipo de gráfico"></div>
+            <div class="actions">
+              <button type="button" class="ghost" id="btn-pin">Fijar en tablero</button>
+              <button type="button" class="ghost" id="btn-csv">Descargar CSV</button>
+              <button type="button" class="ghost" id="btn-png">Descargar imagen</button>
+              <button type="button" class="ghost" id="btn-share">Copiar enlace</button>
+            </div>
+          </div>
+
+          <div class="views">
+            <div role="tabpanel" id="view-chart" aria-labelledby="tab-chart">
+              <div id="kpi" class="kpi" hidden></div>
+              <div id="drill" class="drill" hidden></div>
+              <div id="chart" class="chart" role="img" aria-label="Gráfico del resultado"></div>
+              <p class="drill-hint" id="drill-hint" hidden></p>
+            </div>
+            <div role="tabpanel" id="view-table" aria-labelledby="tab-table" hidden>
+              <div class="table-wrap"><table id="table"></table></div>
+              <p class="table-foot" id="table-foot"></p>
+            </div>
+            <div role="tabpanel" id="view-sql" aria-labelledby="tab-sql" hidden>
+              <div class="sql-head">
+                <span>Puedes editar la consulta y volver a ejecutarla.</span>
+                <span class="sql-actions"><button type="button" class="ghost" id="btn-copy-sql">Copiar</button><button type="button" class="btn-primary small" id="btn-run-sql">Ejecutar SQL</button></span>
+              </div>
+              <textarea id="sql-editor" class="sql-editor" spellcheck="false" aria-label="SQL"></textarea>
+            </div>
+          </div>
+
+          <div class="insights-wrap">
+            <h3>Hallazgos</h3>
+            <ul id="insights" class="insights"></ul>
+          </div>
+          <p class="trace" id="trace"></p>
+        </div>
+
+        <div class="result-error" id="result-error" hidden role="alert"></div>
+      </section>
+    </div>
+
+    <!-- Tablero -->
+    <section class="board-section" aria-labelledby="board-title">
+      <div class="section-head">
+        <h2 id="board-title">Mi tablero</h2>
+        <button type="button" class="ghost" id="btn-clear-board" hidden>Vaciar tablero</button>
+      </div>
+      <p class="hint" id="board-empty">Fija respuestas con «Fijar en tablero» para armar un tablero propio. Se guarda en este navegador.</p>
+      <div id="board" class="board"></div>
+    </section>
+
+    <!-- Cómo funciona -->
+    <section class="how" aria-labelledby="how-title">
+      <h2 id="how-title">Cómo funciona</h2>
+      <ol class="pipeline">
+        <li><b>Lee el esquema.</b> Al cargar un archivo, DuckDB perfila cada columna: tipo, rango, nulos y valores frecuentes. Ese perfil es el vocabulario del motor.</li>
+        <li><b>Anota la pregunta.</b> Reconoce columnas, sinónimos de negocio («ventas» → ingreso), valores reales («Medellín»), fechas en español («últimos 3 meses») y comparadores («más de 10 unidades»).</li>
+        <li><b>Arma una intención.</b> Métrica, agrupación, filtros, periodo, orden y cálculos extra (participación, variación, acumulado, tasas y márgenes). Puedes editarla con los controles.</li>
+        <li><b>Genera SQL.</b> La intención se convierte en una consulta DuckDB legible, que también puedes modificar.</li>
+        <li><b>Ejecuta y explica.</b> La consulta corre en tu navegador con DuckDB-WASM; el resultado se grafica y se analiza en busca de tendencias, concentración y valores atípicos.</li>
+      </ol>
+      <p class="how-note">El <b>motor local</b> no usa IA ni internet: son reglas sobre el esquema, así que funciona con cualquier tabla y responde en milisegundos. El modo <b>Claude</b> es opcional: envía solo el esquema y la pregunta (nunca las filas) a la API de Anthropic con tu propia clave, y si el SQL falla le devuelve el error para que lo corrija.</p>
+    </section>
+
+    <!-- Laboratorio -->
+    <section class="lab" aria-labelledby="lab-title">
+      <div class="section-head">
+        <h2 id="lab-title">Laboratorio del motor</h2>
+        <button type="button" class="btn-primary small" id="btn-lab">Ejecutar las pruebas</button>
+      </div>
+      <p class="hint">Un banco de preguntas con la interpretación esperada. Cada caso verifica métrica, agrupación, filtros y periodo, y que el SQL se ejecute sin errores sobre los datos de demostración.</p>
+      <div id="lab-summary" class="lab-summary" hidden></div>
+      <div class="table-wrap lab-table-wrap" hidden id="lab-table-wrap"><table id="lab-table" class="lab-table"></table></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Proyecto de <a href="https://github.com/johnbyronA" target="_blank" rel="noopener">John Byron Alzate Hernández</a>. Los datos de demostración son sintéticos y la empresa es ficticia.</p>
+    <p class="libs" id="libs"></p>
+  </footer>
+
+  <!-- Ajustes de Claude -->
+  <dialog id="settings" class="dialog" aria-labelledby="settings-title">
+    <form method="dialog" id="settings-form">
+      <h2 id="settings-title">Ajustes de Claude</h2>
+      <p>El modo Claude usa tu clave de la API de Anthropic. La petición va directo de tu navegador a api.anthropic.com con el esquema de la tabla y tu pregunta; las filas de datos no se envían.</p>
+      <label>Clave de API
+        <input type="password" id="api-key" placeholder="sk-ant-…" autocomplete="off">
+      </label>
+      <label>Modelo
+        <select id="api-model"></select>
+      </label>
+      <label class="check"><input type="checkbox" id="api-remember"> Recordar la clave en este navegador</label>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" id="btn-settings-cancel">Cancelar</button>
+        <button type="submit" class="btn-primary" id="btn-settings-save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="src/app/main.js"></script>
+</body>
+</html>

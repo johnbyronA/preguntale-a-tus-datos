@@ -1,0 +1,27 @@
+{
+  "name": "preguntale-a-tus-datos",
+  "version": "1.0.0",
+  "description": "Preguntas en español sobre cualquier tabla: SQL, gráficos y hallazgos en el navegador con DuckDB-WASM.",
+  "scripts": {
+    "test": "node --test tests/engine.test.mjs",
+    "data": "python3 scripts/generate_data.py",
+    "vendor": "node scripts/vendor.mjs",
+    "start": "npx --yes http-server -p 8080 -c-1 ."
+  },
+  "author": "John Byron Alzate Hernández",
+  "license": "MIT",
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev57.0",
+    "echarts": "5.6.0",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^2.0.0-r.1",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "esbuild": "^0.25.12"
+  },
+  "type": "module",
+  "private": true
+}
